@@ -341,12 +341,14 @@ func TestPaths(t *testing.T) {
 		"LICENCE":            "",
 		"License":            "",
 		"COPYING":            "",
+		"COPYING.LESSER":     "",
 		"liCeNse":            "",
 		"foo/LICENSE":        "",
 		"foo/LICENSE.md":     "",
 		"foo/LICENCE":        "",
 		"foo/License":        "",
 		"foo/COPYING":        "",
+		"foo/COPYING.LESSER": "",
 		"foo/license":        "",
 		"vendor/pkg/LICENSE": "", // vendored files ignored
 		"pkg/vendor/LICENSE": "", // not a vendored file, but a package named "vendor"
@@ -357,22 +359,22 @@ func TestPaths(t *testing.T) {
 	}{
 		{
 			RootFiles,
-			[]string{"LICENSE", "LICENCE", "License", "COPYING", "LICENSE.md",
+			[]string{"LICENSE", "LICENCE", "License", "COPYING", "COPYING.LESSER", "LICENSE.md",
 				"liCeNse"},
 		},
 		{
 			NonRootFiles,
 			[]string{
 				"foo/LICENSE", "foo/LICENSE.md", "foo/LICENCE", "foo/License",
-				"foo/COPYING", "pkg/vendor/LICENSE", "foo/license",
+				"foo/COPYING", "foo/COPYING.LESSER", "pkg/vendor/LICENSE", "foo/license",
 			},
 		},
 		{
 			AllFiles,
 			[]string{
-				"LICENSE", "LICENCE", "License", "COPYING", "LICENSE.md",
+				"LICENSE", "LICENCE", "License", "COPYING", "COPYING.LESSER", "LICENSE.md",
 				"liCeNse", "foo/LICENSE", "foo/LICENSE.md", "foo/LICENCE", "foo/License",
-				"foo/license", "foo/COPYING", "pkg/vendor/LICENSE",
+				"foo/license", "foo/COPYING", "foo/COPYING.LESSER", "pkg/vendor/LICENSE",
 			},
 		},
 	} {
