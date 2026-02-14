@@ -88,7 +88,7 @@ export class TreeNavController {
       if (href) {
         const id = href.replace(window.location.origin, '').replace('/', '').replace('#', '');
         const target = document.getElementById(id);
-        if (target) {
+        if (target && !id.startsWith('example-')) {
           observer.observe(target);
         }
       }
