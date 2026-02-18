@@ -12,6 +12,7 @@ import (
 	"go/parser"
 	"go/token"
 	"io"
+	"os"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -89,15 +90,20 @@ func main() { a = 1 }
 
 func packageForDir(dir string, removeNodes bool) (*Package, error) {
 	fset := token.NewFileSet()
-	pkgs, err := parser.ParseDir(fset, dir, nil, parser.ParseComments)
+	des, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, err
 	}
 	p := NewPackage(fset, nil)
-	for _, pkg := range pkgs {
-		for _, f := range pkg.Files {
-			p.AddFile(f, removeNodes)
+	for _, de := range des {
+		if de.IsDir() || !strings.HasSuffix(de.Name(), ".go") {
+			continue
 		}
+		f, err := parser.ParseFile(fset, filepath.Join(dir, de.Name()), nil, parser.ParseComments)
+		if err != nil {
+			return nil, err
+		}
+		p.AddFile(f, removeNodes)
 	}
 	return p, nil
 }
