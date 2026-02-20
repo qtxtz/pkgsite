@@ -72,7 +72,7 @@ func main() {
 
 	src, err := format.Source([]byte(code))
 	if err != nil {
-		fd, err1 := io.TempFile("", "license-data")
+		fd, err1 := os.CreateTemp("", "license-data")
 		if err1 == nil {
 			_, err1 = fd.Write([]byte(code))
 			if err1 == nil {
