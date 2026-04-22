@@ -4,6 +4,8 @@
 
 package client
 
+//go:generate go test -run=TestTypesUpToDate -update
+
 import (
 	"context"
 	"encoding/json"
@@ -34,19 +36,7 @@ func New(server string) (*Client, error) {
 	}, nil
 }
 
-// APIError is the error format returned by the v1 API.
-type APIError struct {
-	Code       int         `json:"code"`
-	Message    string      `json:"message"`
-	Candidates []Candidate `json:"candidates,omitempty"`
-}
-
-type Candidate struct {
-	ModulePath  string `json:"modulePath"`
-	PackagePath string `json:"packagePath"`
-}
-
-func (e *APIError) Error() string {
+func (e *Error) Error() string {
 	if len(e.Candidates) > 0 {
 		var b strings.Builder
 		fmt.Fprintf(&b, "%s; specify module path:\n", e.Message)
@@ -77,34 +67,13 @@ func (c *Client) get(ctx context.Context, url string, dst any) error {
 		if err != nil {
 			return fmt.Errorf("reading error response: %w", err)
 		}
-		var aerr APIError
+		var aerr Error
 		if json.Unmarshal(body, &aerr) == nil && aerr.Message != "" {
 			return &aerr
 		}
 		return fmt.Errorf("HTTP %d: %s", resp.StatusCode, http.StatusText(resp.StatusCode))
 	}
 	return json.NewDecoder(resp.Body).Decode(dst)
-}
-
-// PackageResponse is the JSON response for /v1/package/.
-type PackageResponse struct {
-	Path              string            `json:"path"`
-	ModulePath        string            `json:"modulePath"`
-	ModuleVersion     string            `json:"moduleVersion"`
-	Synopsis          string            `json:"synopsis"`
-	IsStandardLibrary bool              `json:"isStandardLibrary"`
-	IsLatest          bool              `json:"isLatest"`
-	GOOS              string            `json:"goos"`
-	GOARCH            string            `json:"goarch"`
-	Docs              string            `json:"docs,omitempty"`
-	Imports           []string          `json:"imports,omitempty"`
-	Licenses          []LicenseResponse `json:"licenses,omitempty"`
-}
-
-type LicenseResponse struct {
-	Types    []string `json:"types"`
-	FilePath string   `json:"filePath"`
-	Contents string   `json:"contents,omitempty"`
 }
 
 // PackageOptions contains options for GetPackage.
@@ -118,7 +87,7 @@ type PackageOptions struct {
 	GOARCH   string
 }
 
-func (c *Client) GetPackage(ctx context.Context, path, version string, opts PackageOptions) (*PackageResponse, error) {
+func (c *Client) GetPackage(ctx context.Context, path, version string, opts PackageOptions) (*Package, error) {
 	q := make(url.Values)
 	if version != "" {
 		q.Set("version", version)
@@ -147,28 +116,11 @@ func (c *Client) GetPackage(ctx context.Context, path, version string, opts Pack
 	u := c.server.JoinPath("v1", "package", path)
 	u.RawQuery = q.Encode()
 
-	var resp PackageResponse
+	var resp Package
 	if err := c.get(ctx, u.String(), &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
-}
-
-// PaginatedResponse is a generic paginated response.
-type PaginatedResponse[T any] struct {
-	Items         []T    `json:"items"`
-	Total         int    `json:"total"`
-	NextPageToken string `json:"nextPageToken,omitempty"`
-}
-
-// SymbolResponse is a single symbol from /v1/symbols/.
-type SymbolResponse struct {
-	ModulePath string `json:"modulePath"`
-	Version    string `json:"version"`
-	Name       string `json:"name"`
-	Kind       string `json:"kind"`
-	Synopsis   string `json:"synopsis"`
-	Parent     string `json:"parent,omitempty"`
 }
 
 // PaginationOptions contains common pagination options.
@@ -185,7 +137,7 @@ type SymbolsOptions struct {
 	PaginationOptions
 }
 
-func (c *Client) GetSymbols(ctx context.Context, path, version string, opts SymbolsOptions) (*PaginatedResponse[SymbolResponse], error) {
+func (c *Client) GetSymbols(ctx context.Context, path, version string, opts SymbolsOptions) (*PaginatedResponse[Symbol], error) {
 	q := make(url.Values)
 	if version != "" {
 		q.Set("version", version)
@@ -207,18 +159,11 @@ func (c *Client) GetSymbols(ctx context.Context, path, version string, opts Symb
 	}
 	u := c.server.JoinPath("v1", "symbols", path)
 	u.RawQuery = q.Encode()
-	var resp PaginatedResponse[SymbolResponse]
+	var resp PaginatedResponse[Symbol]
 	if err := c.get(ctx, u.String(), &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
-}
-
-// ImportedByResponse is the response for /v1/imported-by/.
-type ImportedByResponse struct {
-	ModulePath string                    `json:"modulePath"`
-	Version    string                    `json:"version"`
-	ImportedBy PaginatedResponse[string] `json:"importedBy"`
 }
 
 // ImportedByOptions contains options for GetImportedBy.
@@ -227,7 +172,7 @@ type ImportedByOptions struct {
 	PaginationOptions
 }
 
-func (c *Client) GetImportedBy(ctx context.Context, path, version string, opts ImportedByOptions) (*ImportedByResponse, error) {
+func (c *Client) GetImportedBy(ctx context.Context, path, version string, opts ImportedByOptions) (*PackageImportedBy, error) {
 	q := make(url.Values)
 	if version != "" {
 		q.Set("version", version)
@@ -243,29 +188,11 @@ func (c *Client) GetImportedBy(ctx context.Context, path, version string, opts I
 	}
 	u := c.server.JoinPath("v1", "imported-by", path)
 	u.RawQuery = q.Encode()
-	var resp ImportedByResponse
+	var resp PackageImportedBy
 	if err := c.get(ctx, u.String(), &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
-}
-
-// ModuleResponse is the JSON response for /v1/module/.
-type ModuleResponse struct {
-	Path              string            `json:"path"`
-	Version           string            `json:"version"`
-	IsLatest          bool              `json:"isLatest"`
-	IsRedistributable bool              `json:"isRedistributable"`
-	IsStandardLibrary bool              `json:"isStandardLibrary"`
-	HasGoMod          bool              `json:"hasGoMod"`
-	RepoURL           string            `json:"repoUrl"`
-	Readme            *ReadmeResponse   `json:"readme,omitempty"`
-	Licenses          []LicenseResponse `json:"licenses,omitempty"`
-}
-
-type ReadmeResponse struct {
-	Filepath string `json:"filepath"`
-	Contents string `json:"contents"`
 }
 
 // ModuleOptions contains options for GetModule.
@@ -274,7 +201,7 @@ type ModuleOptions struct {
 	Licenses bool
 }
 
-func (c *Client) GetModule(ctx context.Context, path, version string, opts ModuleOptions) (*ModuleResponse, error) {
+func (c *Client) GetModule(ctx context.Context, path, version string, opts ModuleOptions) (*Module, error) {
 	q := make(url.Values)
 	if version != "" {
 		q.Set("version", version)
@@ -287,7 +214,7 @@ func (c *Client) GetModule(ctx context.Context, path, version string, opts Modul
 	}
 	u := c.server.JoinPath("v1", "module", path)
 	u.RawQuery = q.Encode()
-	var resp ModuleResponse
+	var resp Module
 	if err := c.get(ctx, u.String(), &resp); err != nil {
 		return nil, err
 	}
@@ -316,15 +243,7 @@ func (c *Client) GetVersions(ctx context.Context, path string, opts PaginationOp
 	return &resp, nil
 }
 
-// VulnResponse is a single vulnerability from /v1/vulns/.
-type VulnResponse struct {
-	ID           string `json:"id"`
-	Summary      string `json:"summary"`
-	Details      string `json:"details"`
-	FixedVersion string `json:"fixedVersion"`
-}
-
-func (c *Client) GetVulns(ctx context.Context, path, version string, opts PaginationOptions) (*PaginatedResponse[VulnResponse], error) {
+func (c *Client) GetVulns(ctx context.Context, path, version string, opts PaginationOptions) (*PaginatedResponse[Vulnerability], error) {
 	q := make(url.Values)
 	if version != "" {
 		q.Set("version", version)
@@ -337,7 +256,7 @@ func (c *Client) GetVulns(ctx context.Context, path, version string, opts Pagina
 	}
 	u := c.server.JoinPath("v1", "vulns", path)
 	u.RawQuery = q.Encode()
-	var resp PaginatedResponse[VulnResponse]
+	var resp PaginatedResponse[Vulnerability]
 	if err := c.get(ctx, u.String(), &resp); err != nil {
 		return nil, err
 	}
@@ -370,21 +289,13 @@ func (c *Client) GetPackages(ctx context.Context, modulePath, version string, op
 	return &resp, nil
 }
 
-// SearchResultResponse is a single search result from /v1/search/.
-type SearchResultResponse struct {
-	PackagePath string `json:"packagePath"`
-	ModulePath  string `json:"modulePath"`
-	Version     string `json:"version"`
-	Synopsis    string `json:"synopsis"`
-}
-
 // SearchOptions contains options for Search.
 type SearchOptions struct {
 	Symbol string
 	PaginationOptions
 }
 
-func (c *Client) Search(ctx context.Context, query string, opts SearchOptions) (*PaginatedResponse[SearchResultResponse], error) {
+func (c *Client) Search(ctx context.Context, query string, opts SearchOptions) (*PaginatedResponse[SearchResult], error) {
 	q := make(url.Values)
 	q.Set("q", query)
 	if opts.Symbol != "" {
@@ -398,7 +309,7 @@ func (c *Client) Search(ctx context.Context, query string, opts SearchOptions) (
 	}
 	u := c.server.JoinPath("v1", "search")
 	u.RawQuery = q.Encode()
-	var resp PaginatedResponse[SearchResultResponse]
+	var resp PaginatedResponse[SearchResult]
 	if err := c.get(ctx, u.String(), &resp); err != nil {
 		return nil, err
 	}

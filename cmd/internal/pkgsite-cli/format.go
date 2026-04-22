@@ -16,15 +16,15 @@ import (
 // These are used for both text formatting and JSON output.
 
 type packageResult struct {
-	Package    *client.PackageResponse                          `json:"package"`
-	Symbols    *client.PaginatedResponse[client.SymbolResponse] `json:"symbols,omitempty"`
-	ImportedBy *client.ImportedByResponse                       `json:"importedBy,omitempty"`
+	Package    *client.Package                          `json:"package"`
+	Symbols    *client.PaginatedResponse[client.Symbol] `json:"symbols,omitempty"`
+	ImportedBy *client.PackageImportedBy                `json:"importedBy,omitempty"`
 }
 
 type moduleResult struct {
-	Module   *client.ModuleResponse                                  `json:"module"`
+	Module   *client.Module                                          `json:"module"`
 	Versions *client.PaginatedResponse[client.VersionResponse]       `json:"versions,omitempty"`
-	Vulns    *client.PaginatedResponse[client.VulnResponse]          `json:"vulns,omitempty"`
+	Vulns    *client.PaginatedResponse[client.Vulnerability]         `json:"vulns,omitempty"`
 	Packages *client.PaginatedResponse[client.ModulePackageResponse] `json:"packages,omitempty"`
 }
 
@@ -154,7 +154,7 @@ func formatModule(w io.Writer, r moduleResult) {
 	}
 }
 
-func formatSearch(w io.Writer, r *client.PaginatedResponse[client.SearchResultResponse]) {
+func formatSearch(w io.Writer, r *client.PaginatedResponse[client.SearchResult]) {
 	if len(r.Items) == 0 {
 		fmt.Fprintln(w, "No results.")
 		return
@@ -170,7 +170,7 @@ func formatSearch(w io.Writer, r *client.PaginatedResponse[client.SearchResultRe
 	formatPaginationHint(w, len(r.Items), r.Total)
 }
 
-func formatLicenses(w io.Writer, licenses []client.LicenseResponse) {
+func formatLicenses(w io.Writer, licenses []client.License) {
 	fmt.Fprintln(w, "Licenses:")
 	for _, l := range licenses {
 		fmt.Fprintf(w, "  %s (%s)\n", strings.Join(l.Types, ", "), l.FilePath)

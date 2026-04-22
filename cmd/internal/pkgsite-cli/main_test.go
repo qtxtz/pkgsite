@@ -70,7 +70,7 @@ func TestRunSubcommandHelp(t *testing.T) {
 
 func TestRunPackage(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(client.PackageResponse{
+		json.NewEncoder(w).Encode(client.Package{
 			Path:              "encoding/json",
 			ModulePath:        "std",
 			ModuleVersion:     "go1.22.0",
@@ -93,7 +93,7 @@ func TestRunPackage(t *testing.T) {
 
 func TestRunPackageJSON(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(client.PackageResponse{
+		json.NewEncoder(w).Encode(client.Package{
 			Path:       "encoding/json",
 			ModulePath: "std",
 		})
@@ -116,7 +116,7 @@ func TestRunPackageJSON(t *testing.T) {
 
 func TestRunModule(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(client.ModuleResponse{
+		json.NewEncoder(w).Encode(client.Module{
 			Path:     "golang.org/x/text",
 			Version:  "v0.14.0",
 			IsLatest: true,
@@ -141,8 +141,8 @@ func TestRunModule(t *testing.T) {
 
 func TestRunSearch(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(client.PaginatedResponse[client.SearchResultResponse]{
-			Items: []client.SearchResultResponse{{
+		json.NewEncoder(w).Encode(client.PaginatedResponse[client.SearchResult]{
+			Items: []client.SearchResult{{
 				PackagePath: "encoding/json",
 				ModulePath:  "std",
 				Version:     "go1.22.0",
@@ -165,7 +165,7 @@ func TestRunSearch(t *testing.T) {
 func TestRunAPIError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(client.APIError{Code: 404, Message: "not found"})
+		json.NewEncoder(w).Encode(client.Error{Code: 404, Message: "not found"})
 	}))
 	defer srv.Close()
 
@@ -182,7 +182,7 @@ func TestRunAPIError(t *testing.T) {
 func TestRunAPIErrorJSON(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(client.APIError{Code: 404, Message: "not found"})
+		json.NewEncoder(w).Encode(client.Error{Code: 404, Message: "not found"})
 	}))
 	defer srv.Close()
 
@@ -206,12 +206,12 @@ func TestRunModuleWithVersions(t *testing.T) {
 				Total: 2,
 			})
 		case strings.HasPrefix(r.URL.Path, "/v1/vulns/"):
-			json.NewEncoder(w).Encode(client.PaginatedResponse[client.VulnResponse]{
-				Items: []client.VulnResponse{{ID: "GO-2023-0001", Summary: "Bad thing"}},
+			json.NewEncoder(w).Encode(client.PaginatedResponse[client.Vulnerability]{
+				Items: []client.Vulnerability{{ID: "GO-2023-0001", Summary: "Bad thing"}},
 				Total: 1,
 			})
 		default:
-			json.NewEncoder(w).Encode(client.ModuleResponse{
+			json.NewEncoder(w).Encode(client.Module{
 				Path:    "golang.org/x/text",
 				Version: "v0.14.0",
 			})

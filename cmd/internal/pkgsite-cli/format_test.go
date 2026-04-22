@@ -15,7 +15,7 @@ import (
 func TestFormatPackage(t *testing.T) {
 	var buf bytes.Buffer
 	formatPackage(&buf, packageResult{
-		Package: &client.PackageResponse{
+		Package: &client.Package{
 			Path:              "encoding/json",
 			ModulePath:        "std",
 			ModuleVersion:     "go1.22.0",
@@ -40,20 +40,20 @@ func TestFormatPackage(t *testing.T) {
 func TestFormatPackageWithExtras(t *testing.T) {
 	var buf bytes.Buffer
 	formatPackage(&buf, packageResult{
-		Package: &client.PackageResponse{
+		Package: &client.Package{
 			Path:          "github.com/foo/bar",
 			ModulePath:    "github.com/foo/bar",
 			ModuleVersion: "v1.0.0",
 			Imports:       []string{"fmt", "strings"},
-			Licenses:      []client.LicenseResponse{{Types: []string{"MIT"}, FilePath: "LICENSE"}},
+			Licenses:      []client.License{{Types: []string{"MIT"}, FilePath: "LICENSE"}},
 		},
-		Symbols: &client.PaginatedResponse[client.SymbolResponse]{
-			Items: []client.SymbolResponse{
+		Symbols: &client.PaginatedResponse[client.Symbol]{
+			Items: []client.Symbol{
 				{Name: "New", Kind: "func", Synopsis: "func New() *Bar"},
 			},
 			Total: 1,
 		},
-		ImportedBy: &client.ImportedByResponse{
+		ImportedBy: &client.PackageImportedBy{
 			ImportedBy: client.PaginatedResponse[string]{
 				Items: []string{"github.com/baz/qux"},
 				Total: 100,
@@ -81,7 +81,7 @@ func TestFormatPackageWithExtras(t *testing.T) {
 func TestFormatModule(t *testing.T) {
 	var buf bytes.Buffer
 	formatModule(&buf, moduleResult{
-		Module: &client.ModuleResponse{
+		Module: &client.Module{
 			Path:              "golang.org/x/text",
 			Version:           "v0.14.0",
 			IsLatest:          true,
@@ -107,17 +107,17 @@ func TestFormatModule(t *testing.T) {
 func TestFormatModuleWithExtras(t *testing.T) {
 	var buf bytes.Buffer
 	formatModule(&buf, moduleResult{
-		Module: &client.ModuleResponse{
+		Module: &client.Module{
 			Path:    "golang.org/x/text",
 			Version: "v0.14.0",
-			Readme:  &client.ReadmeResponse{Filepath: "README.md", Contents: "# text"},
+			Readme:  &client.Readme{Filepath: "README.md", Contents: "# text"},
 		},
 		Versions: &client.PaginatedResponse[client.VersionResponse]{
 			Items: []client.VersionResponse{{Version: "v0.14.0"}, {Version: "v0.13.0"}},
 			Total: 2,
 		},
-		Vulns: &client.PaginatedResponse[client.VulnResponse]{
-			Items: []client.VulnResponse{{ID: "GO-2023-0001", Summary: "Bad thing", FixedVersion: "v0.14.0"}},
+		Vulns: &client.PaginatedResponse[client.Vulnerability]{
+			Items: []client.Vulnerability{{ID: "GO-2023-0001", Summary: "Bad thing", FixedVersion: "v0.14.0"}},
 			Total: 1,
 		},
 		Packages: &client.PaginatedResponse[client.ModulePackageResponse]{
@@ -146,8 +146,8 @@ func TestFormatModuleWithExtras(t *testing.T) {
 
 func TestFormatSearch(t *testing.T) {
 	var buf bytes.Buffer
-	formatSearch(&buf, &client.PaginatedResponse[client.SearchResultResponse]{
-		Items: []client.SearchResultResponse{{
+	formatSearch(&buf, &client.PaginatedResponse[client.SearchResult]{
+		Items: []client.SearchResult{{
 			PackagePath: "encoding/json",
 			ModulePath:  "std",
 			Version:     "go1.22.0",
@@ -166,7 +166,7 @@ func TestFormatSearch(t *testing.T) {
 
 func TestFormatSearchEmpty(t *testing.T) {
 	var buf bytes.Buffer
-	formatSearch(&buf, &client.PaginatedResponse[client.SearchResultResponse]{})
+	formatSearch(&buf, &client.PaginatedResponse[client.SearchResult]{})
 	if !strings.Contains(buf.String(), "No results") {
 		t.Errorf("expected 'No results' message, got:\n%s", buf.String())
 	}

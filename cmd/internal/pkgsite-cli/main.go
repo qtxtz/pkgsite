@@ -98,9 +98,9 @@ func splitPathVersion(s string) (path, version string) {
 // goes to stderr.
 func handleErr(stdout, stderr io.Writer, err error, jsonMode bool) {
 	if jsonMode {
-		aerr, ok := err.(*client.APIError)
+		aerr, ok := err.(*client.Error)
 		if !ok {
-			aerr = &client.APIError{Code: 1, Message: err.Error()}
+			aerr = &client.Error{Code: 1, Message: err.Error()}
 		}
 		writeJSON(stdout, stderr, aerr)
 		return
