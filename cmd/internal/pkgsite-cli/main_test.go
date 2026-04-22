@@ -256,7 +256,7 @@ func TestNoThirdPartyImports(t *testing.T) {
 		}
 		for _, imp := range f.Imports {
 			path := strings.Trim(imp.Path.Value, `"`)
-			if strings.Contains(path, ".") && !strings.HasPrefix(path, "golang.org/x/pkgsite") {
+			if strings.Contains(path, ".") && !strings.HasPrefix(path, "golang.org/x/pkgsite") && path != "golang.org/x/sync/errgroup" {
 				t.Errorf("%s imports third-party package %q", e.Name(), path)
 			}
 		}

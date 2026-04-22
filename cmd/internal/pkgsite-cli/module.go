@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"golang.org/x/pkgsite/cmd/internal/pkgsite-cli/client"
+	"golang.org/x/sync/errgroup"
 )
 
 func runModule(fs *flag.FlagSet, m *moduleFlags, stdout, stderr io.Writer) int {
@@ -38,40 +39,53 @@ func runModule(fs *flag.FlagSet, m *moduleFlags, stdout, stderr io.Writer) int {
 	}
 	result := moduleResult{Module: mod}
 
-	// TODO: run concurrently ?
+	var (
+		vers  *client.PaginatedResponse[client.VersionResponse]
+		vulns *client.PaginatedResponse[client.Vulnerability]
+		pkgs  *client.PaginatedResponse[client.ModulePackageResponse]
+	)
+
+	g, gctx := errgroup.WithContext(ctx)
+
 	if m.versions {
-		vers, err := c.GetVersions(ctx, path, client.PaginationOptions{
-			Limit: m.effectiveLimit(),
-			Token: m.token,
+		g.Go(func() error {
+			var err error
+			vers, err = c.GetVersions(gctx, path, client.PaginationOptions{
+				Limit: m.effectiveLimit(),
+				Token: m.token,
+			})
+			return err
 		})
-		if err != nil {
-			handleErr(stdout, stderr, err, m.jsonOut)
-			return 1
-		}
-		result.Versions = vers
 	}
 	if m.vulns {
-		vulns, err := c.GetVulns(ctx, path, version, client.PaginationOptions{
-			Limit: m.effectiveLimit(),
-			Token: m.token,
+		g.Go(func() error {
+			var err error
+			vulns, err = c.GetVulns(gctx, path, version, client.PaginationOptions{
+				Limit: m.effectiveLimit(),
+				Token: m.token,
+			})
+			return err
 		})
-		if err != nil {
-			handleErr(stdout, stderr, err, m.jsonOut)
-			return 1
-		}
-		result.Vulns = vulns
 	}
 	if m.packages {
-		pkgs, err := c.GetPackages(ctx, path, version, client.PaginationOptions{
-			Limit: m.effectiveLimit(),
-			Token: m.token,
+		g.Go(func() error {
+			var err error
+			pkgs, err = c.GetPackages(gctx, path, version, client.PaginationOptions{
+				Limit: m.effectiveLimit(),
+				Token: m.token,
+			})
+			return err
 		})
-		if err != nil {
-			handleErr(stdout, stderr, err, m.jsonOut)
-			return 1
-		}
-		result.Packages = pkgs
 	}
+
+	if err := g.Wait(); err != nil {
+		handleErr(stdout, stderr, err, m.jsonOut)
+		return 1
+	}
+
+	result.Versions = vers
+	result.Vulns = vulns
+	result.Packages = pkgs
 
 	if m.jsonOut {
 		return writeJSON(stdout, stderr, result)
