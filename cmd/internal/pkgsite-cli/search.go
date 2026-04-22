@@ -5,9 +5,13 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"io"
 	"strings"
+	"time"
+
+	"golang.org/x/pkgsite/cmd/internal/pkgsite-cli/client"
 )
 
 func runSearch(fs *flag.FlagSet, s *searchFlags, stdout, stderr io.Writer) int {
@@ -17,10 +21,24 @@ func runSearch(fs *flag.FlagSet, s *searchFlags, stdout, stderr io.Writer) int {
 	}
 	query := strings.Join(fs.Args(), " ")
 
-	c := newClient(s.server)
-	results, err := c.search(query, s)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	c, err := client.New(s.server)
 	if err != nil {
-		return handleErr(stdout, stderr, err, s.jsonOut)
+		handleErr(stdout, stderr, err, s.jsonOut)
+		return 1
+	}
+	results, err := c.Search(ctx, query, client.SearchOptions{
+		Symbol: s.symbol,
+		PaginationOptions: client.PaginationOptions{
+			Limit: s.effectiveLimit(),
+			Token: s.token,
+		},
+	})
+	if err != nil {
+		handleErr(stdout, stderr, err, s.jsonOut)
+		return 1
 	}
 
 	if s.jsonOut {

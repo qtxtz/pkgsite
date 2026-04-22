@@ -5,8 +5,12 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"io"
+	"time"
+
+	"golang.org/x/pkgsite/cmd/internal/pkgsite-cli/client"
 )
 
 func runModule(fs *flag.FlagSet, m *moduleFlags, stdout, stderr io.Writer) int {
@@ -16,32 +20,55 @@ func runModule(fs *flag.FlagSet, m *moduleFlags, stdout, stderr io.Writer) int {
 	}
 	path, version := splitPathVersion(fs.Arg(0))
 
-	c := newClient(m.server)
-	mod, err := c.getModule(path, version, m)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	c, err := client.New(m.server)
 	if err != nil {
-		return handleErr(stdout, stderr, err, m.jsonOut)
+		handleErr(stdout, stderr, err, m.jsonOut)
+		return 1
+	}
+	mod, err := c.GetModule(ctx, path, version, client.ModuleOptions{
+		Readme:   m.readme,
+		Licenses: m.licenses,
+	})
+	if err != nil {
+		handleErr(stdout, stderr, err, m.jsonOut)
+		return 1
 	}
 	result := moduleResult{Module: mod}
 
 	// TODO: run concurrently ?
 	if m.versions {
-		vers, err := c.getVersions(path, m)
+		vers, err := c.GetVersions(ctx, path, client.PaginationOptions{
+			Limit: m.effectiveLimit(),
+			Token: m.token,
+		})
 		if err != nil {
-			return handleErr(stdout, stderr, err, m.jsonOut)
+			handleErr(stdout, stderr, err, m.jsonOut)
+			return 1
 		}
 		result.Versions = vers
 	}
 	if m.vulns {
-		vulns, err := c.getVulns(path, version, m)
+		vulns, err := c.GetVulns(ctx, path, version, client.PaginationOptions{
+			Limit: m.effectiveLimit(),
+			Token: m.token,
+		})
 		if err != nil {
-			return handleErr(stdout, stderr, err, m.jsonOut)
+			handleErr(stdout, stderr, err, m.jsonOut)
+			return 1
 		}
 		result.Vulns = vulns
 	}
 	if m.packages {
-		pkgs, err := c.getPackages(path, version, m)
+		pkgs, err := c.GetPackages(ctx, path, version, client.PaginationOptions{
+			Limit: m.effectiveLimit(),
+			Token: m.token,
+		})
 		if err != nil {
-			return handleErr(stdout, stderr, err, m.jsonOut)
+			handleErr(stdout, stderr, err, m.jsonOut)
+			return 1
 		}
 		result.Packages = pkgs
 	}

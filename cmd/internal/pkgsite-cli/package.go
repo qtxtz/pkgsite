@@ -5,9 +5,13 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io"
+	"time"
+
+	"golang.org/x/pkgsite/cmd/internal/pkgsite-cli/client"
 )
 
 func runPackage(fs *flag.FlagSet, p *packageFlags, stdout, stderr io.Writer) int {
@@ -18,24 +22,56 @@ func runPackage(fs *flag.FlagSet, p *packageFlags, stdout, stderr io.Writer) int
 	}
 	path, version := splitPathVersion(fs.Arg(0))
 
-	c := newClient(p.server)
-	pkg, err := c.getPackage(path, version, p)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	c, err := client.New(p.server)
 	if err != nil {
-		return handleErr(stdout, stderr, err, p.jsonOut)
+		handleErr(stdout, stderr, err, p.jsonOut)
+		return 1
+	}
+	pkg, err := c.GetPackage(ctx, path, version, client.PackageOptions{
+		Module:   p.module,
+		Doc:      p.doc,
+		Examples: p.examples,
+		Imports:  p.imports,
+		Licenses: p.licenses,
+		GOOS:     p.goos,
+		GOARCH:   p.goarch,
+	})
+	if err != nil {
+		handleErr(stdout, stderr, err, p.jsonOut)
+		return 1
 	}
 	result := packageResult{Package: pkg}
 
 	if p.symbols {
-		syms, err := c.getSymbols(path, version, p)
+		syms, err := c.GetSymbols(ctx, path, version, client.SymbolsOptions{
+			Module: p.module,
+			GOOS:   p.goos,
+			GOARCH: p.goarch,
+			PaginationOptions: client.PaginationOptions{
+				Limit: p.effectiveLimit(),
+				Token: p.token,
+			},
+		})
 		if err != nil {
-			return handleErr(stdout, stderr, err, p.jsonOut)
+			handleErr(stdout, stderr, err, p.jsonOut)
+			return 1
 		}
 		result.Symbols = syms
 	}
 	if p.importedBy {
-		ib, err := c.getImportedBy(path, version, p)
+		ib, err := c.GetImportedBy(ctx, path, version, client.ImportedByOptions{
+			Module: p.module,
+			PaginationOptions: client.PaginationOptions{
+				Limit: p.effectiveLimit(),
+				Token: p.token,
+			},
+		})
 		if err != nil {
-			return handleErr(stdout, stderr, err, p.jsonOut)
+			handleErr(stdout, stderr, err, p.jsonOut)
+			return 1
 		}
 		result.ImportedBy = ib
 	}

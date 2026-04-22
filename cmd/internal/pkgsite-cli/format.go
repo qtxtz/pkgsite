@@ -8,22 +8,24 @@ import (
 	"fmt"
 	"io"
 	"strings"
+
+	"golang.org/x/pkgsite/cmd/internal/pkgsite-cli/client"
 )
 
 // Result types combine base entity data with optional supplementary data.
 // These are used for both text formatting and JSON output.
 
 type packageResult struct {
-	Package    *packageResponse                   `json:"package"`
-	Symbols    *paginatedResponse[symbolResponse] `json:"symbols,omitempty"`
-	ImportedBy *importedByResponse                `json:"importedBy,omitempty"`
+	Package    *client.PackageResponse                          `json:"package"`
+	Symbols    *client.PaginatedResponse[client.SymbolResponse] `json:"symbols,omitempty"`
+	ImportedBy *client.ImportedByResponse                       `json:"importedBy,omitempty"`
 }
 
 type moduleResult struct {
-	Module   *moduleResponse                           `json:"module"`
-	Versions *paginatedResponse[versionResponse]       `json:"versions,omitempty"`
-	Vulns    *paginatedResponse[vulnResponse]          `json:"vulns,omitempty"`
-	Packages *paginatedResponse[modulePackageResponse] `json:"packages,omitempty"`
+	Module   *client.ModuleResponse                                  `json:"module"`
+	Versions *client.PaginatedResponse[client.VersionResponse]       `json:"versions,omitempty"`
+	Vulns    *client.PaginatedResponse[client.VulnResponse]          `json:"vulns,omitempty"`
+	Packages *client.PaginatedResponse[client.ModulePackageResponse] `json:"packages,omitempty"`
 }
 
 func formatPackage(w io.Writer, r packageResult) {
@@ -152,7 +154,7 @@ func formatModule(w io.Writer, r moduleResult) {
 	}
 }
 
-func formatSearch(w io.Writer, r *paginatedResponse[searchResultResponse]) {
+func formatSearch(w io.Writer, r *client.PaginatedResponse[client.SearchResultResponse]) {
 	if len(r.Items) == 0 {
 		fmt.Fprintln(w, "No results.")
 		return
@@ -168,7 +170,7 @@ func formatSearch(w io.Writer, r *paginatedResponse[searchResultResponse]) {
 	formatPaginationHint(w, len(r.Items), r.Total)
 }
 
-func formatLicenses(w io.Writer, licenses []licenseResponse) {
+func formatLicenses(w io.Writer, licenses []client.LicenseResponse) {
 	fmt.Fprintln(w, "Licenses:")
 	for _, l := range licenses {
 		fmt.Fprintf(w, "  %s (%s)\n", strings.Join(l.Types, ", "), l.FilePath)

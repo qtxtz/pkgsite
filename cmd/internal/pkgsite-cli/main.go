@@ -22,6 +22,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"golang.org/x/pkgsite/cmd/internal/pkgsite-cli/client"
 )
 
 func main() {
@@ -94,17 +96,16 @@ func splitPathVersion(s string) (path, version string) {
 // handleErr writes an error message. In JSON mode, the error is written
 // to stdout as a JSON object so callers can parse it. In text mode, it
 // goes to stderr.
-func handleErr(stdout, stderr io.Writer, err error, jsonMode bool) int {
+func handleErr(stdout, stderr io.Writer, err error, jsonMode bool) {
 	if jsonMode {
-		aerr, ok := err.(*apiError)
+		aerr, ok := err.(*client.APIError)
 		if !ok {
-			aerr = &apiError{Code: 1, Message: err.Error()}
+			aerr = &client.APIError{Code: 1, Message: err.Error()}
 		}
 		writeJSON(stdout, stderr, aerr)
-		return 1
+		return
 	}
 	fmt.Fprintln(stderr, err)
-	return 1
 }
 
 func writeJSON(stdout, stderr io.Writer, v any) int {

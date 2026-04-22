@@ -2,9 +2,10 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package main
+package client
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -23,7 +24,7 @@ func TestGetPackage(t *testing.T) {
 		if got := r.URL.Query().Get("version"); got != "go1.26.0" {
 			t.Errorf("version = %q, want go1.26.0", got)
 		}
-		json.NewEncoder(w).Encode(packageResponse{
+		json.NewEncoder(w).Encode(PackageResponse{
 			Path:              "encoding/json",
 			ModulePath:        "std",
 			ModuleVersion:     "go1.26.0",
@@ -33,9 +34,11 @@ func TestGetPackage(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := newClient(srv.URL)
-	f := &packageFlags{}
-	resp, err := c.getPackage("encoding/json", "go1.26.0", f)
+	c, err := New(srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := c.GetPackage(context.Background(), "encoding/json", "go1.26.0", PackageOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +65,7 @@ func TestGetPackageWithFlags(t *testing.T) {
 		if got := q.Get("module"); got != "github.com/foo/bar" {
 			t.Errorf("module = %q, want github.com/foo/bar", got)
 		}
-		json.NewEncoder(w).Encode(packageResponse{
+		json.NewEncoder(w).Encode(PackageResponse{
 			Path:    "github.com/foo/bar/pkg",
 			Docs:    "# package pkg",
 			Imports: []string{"fmt", "strings"},
@@ -70,14 +73,16 @@ func TestGetPackageWithFlags(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := newClient(srv.URL)
-	f := &packageFlags{
-		doc:      "md",
-		imports:  true,
-		licenses: true,
-		module:   "github.com/foo/bar",
+	c, err := New(srv.URL)
+	if err != nil {
+		t.Fatal(err)
 	}
-	resp, err := c.getPackage("github.com/foo/bar/pkg", "", f)
+	resp, err := c.GetPackage(context.Background(), "github.com/foo/bar/pkg", "", PackageOptions{
+		Doc:      "md",
+		Imports:  true,
+		Licenses: true,
+		Module:   "github.com/foo/bar",
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +99,7 @@ func TestGetModule(t *testing.T) {
 		if r.URL.Path != "/v1/module/golang.org/x/text" {
 			t.Errorf("path = %q, want /v1/module/golang.org/x/text", r.URL.Path)
 		}
-		json.NewEncoder(w).Encode(moduleResponse{
+		json.NewEncoder(w).Encode(ModuleResponse{
 			Path:    "golang.org/x/text",
 			Version: "v0.14.0",
 			RepoURL: "https://github.com/golang/text",
@@ -102,9 +107,11 @@ func TestGetModule(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := newClient(srv.URL)
-	f := &moduleFlags{}
-	resp, err := c.getModule("golang.org/x/text", "v0.14.0", f)
+	c, err := New(srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := c.GetModule(context.Background(), "golang.org/x/text", "v0.14.0", ModuleOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,16 +125,18 @@ func TestGetVersions(t *testing.T) {
 		if r.URL.Path != "/v1/versions/golang.org/x/text" {
 			t.Errorf("path = %q, want /v1/versions/golang.org/x/text", r.URL.Path)
 		}
-		json.NewEncoder(w).Encode(paginatedResponse[versionResponse]{
-			Items: []versionResponse{{Version: "v0.14.0"}, {Version: "v0.13.0"}},
+		json.NewEncoder(w).Encode(PaginatedResponse[VersionResponse]{
+			Items: []VersionResponse{{Version: "v0.14.0"}, {Version: "v0.13.0"}},
 			Total: 2,
 		})
 	}))
 	defer srv.Close()
 
-	c := newClient(srv.URL)
-	f := &moduleFlags{}
-	resp, err := c.getVersions("golang.org/x/text", f)
+	c, err := New(srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := c.GetVersions(context.Background(), "golang.org/x/text", PaginationOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,16 +147,18 @@ func TestGetVersions(t *testing.T) {
 
 func TestGetVulns(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(paginatedResponse[vulnResponse]{
-			Items: []vulnResponse{{ID: "GO-2023-0001", Details: "A vulnerability."}},
+		json.NewEncoder(w).Encode(PaginatedResponse[VulnResponse]{
+			Items: []VulnResponse{{ID: "GO-2023-0001", Details: "A vulnerability."}},
 			Total: 1,
 		})
 	}))
 	defer srv.Close()
 
-	c := newClient(srv.URL)
-	f := &moduleFlags{}
-	resp, err := c.getVulns("golang.org/x/text", "v0.3.0", f)
+	c, err := New(srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := c.GetVulns(context.Background(), "golang.org/x/text", "v0.3.0", PaginationOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -164,8 +175,8 @@ func TestSearch(t *testing.T) {
 		if got := r.URL.Query().Get("q"); got != "json parser" {
 			t.Errorf("q = %q, want %q", got, "json parser")
 		}
-		json.NewEncoder(w).Encode(paginatedResponse[searchResultResponse]{
-			Items: []searchResultResponse{{
+		json.NewEncoder(w).Encode(PaginatedResponse[SearchResultResponse]{
+			Items: []SearchResultResponse{{
 				PackagePath: "encoding/json",
 				ModulePath:  "std",
 				Version:     "go1.26.0",
@@ -176,9 +187,11 @@ func TestSearch(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := newClient(srv.URL)
-	f := &searchFlags{}
-	resp, err := c.search("json parser", f)
+	c, err := New(srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := c.Search(context.Background(), "json parser", SearchOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -189,8 +202,8 @@ func TestSearch(t *testing.T) {
 
 func TestGetSymbols(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(paginatedResponse[symbolResponse]{
-			Items: []symbolResponse{{
+		json.NewEncoder(w).Encode(PaginatedResponse[SymbolResponse]{
+			Items: []SymbolResponse{{
 				Name:     "Marshal",
 				Kind:     "func",
 				Synopsis: "func Marshal(v any) ([]byte, error)",
@@ -200,9 +213,11 @@ func TestGetSymbols(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := newClient(srv.URL)
-	f := &packageFlags{}
-	resp, err := c.getSymbols("encoding/json", "", f)
+	c, err := New(srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := c.GetSymbols(context.Background(), "encoding/json", "", SymbolsOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -213,10 +228,10 @@ func TestGetSymbols(t *testing.T) {
 
 func TestGetImportedBy(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(importedByResponse{
+		json.NewEncoder(w).Encode(ImportedByResponse{
 			ModulePath: "std",
 			Version:    "go1.26.0",
-			ImportedBy: paginatedResponse[string]{
+			ImportedBy: PaginatedResponse[string]{
 				Items: []string{"github.com/foo/bar", "github.com/baz/qux"},
 				Total: 2,
 			},
@@ -224,9 +239,11 @@ func TestGetImportedBy(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := newClient(srv.URL)
-	f := &packageFlags{}
-	resp, err := c.getImportedBy("encoding/json", "", f)
+	c, err := New(srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := c.GetImportedBy(context.Background(), "encoding/json", "", ImportedByOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -235,35 +252,13 @@ func TestGetImportedBy(t *testing.T) {
 	}
 }
 
-func TestGetPackages(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(paginatedResponse[modulePackageResponse]{
-			Items: []modulePackageResponse{
-				{Path: "golang.org/x/text/language", Synopsis: "Package language implements BCP 47 language tags."},
-			},
-			Total: 1,
-		})
-	}))
-	defer srv.Close()
-
-	c := newClient(srv.URL)
-	f := &moduleFlags{}
-	resp, err := c.getPackages("golang.org/x/text", "", f)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if resp.Items[0].Path != "golang.org/x/text/language" {
-		t.Errorf("Path = %q, want golang.org/x/text/language", resp.Items[0].Path)
-	}
-}
-
 func TestAmbiguousPackagePath(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(apiError{
+		json.NewEncoder(w).Encode(APIError{
 			Code:    400,
 			Message: "ambiguous package path",
-			Candidates: []candidate{
+			Candidates: []Candidate{
 				{ModulePath: "github.com/foo/bar", PackagePath: "github.com/foo/bar/pkg"},
 				{ModulePath: "github.com/foo/bar/pkg", PackagePath: "github.com/foo/bar/pkg"},
 			},
@@ -271,8 +266,11 @@ func TestAmbiguousPackagePath(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := newClient(srv.URL)
-	_, err := c.getPackage("github.com/foo/bar/pkg", "", &packageFlags{})
+	c, err := New(srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = c.GetPackage(context.Background(), "github.com/foo/bar/pkg", "", PackageOptions{})
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -288,18 +286,21 @@ func TestAmbiguousPackagePath(t *testing.T) {
 func TestAPIError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(apiError{Code: 404, Message: "not found"})
+		json.NewEncoder(w).Encode(APIError{Code: 404, Message: "not found"})
 	}))
 	defer srv.Close()
 
-	c := newClient(srv.URL)
-	_, err := c.getPackage("nonexistent/pkg", "", &packageFlags{})
+	c, err := New(srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = c.GetPackage(context.Background(), "nonexistent/pkg", "", PackageOptions{})
 	if err == nil {
 		t.Fatal("expected error")
 	}
-	aerr, ok := err.(*apiError)
+	aerr, ok := err.(*APIError)
 	if !ok {
-		t.Fatalf("error type = %T, want *apiError", err)
+		t.Fatalf("error type = %T, want *APIError", err)
 	}
 	if aerr.Code != 404 {
 		t.Errorf("Code = %d, want 404", aerr.Code)
