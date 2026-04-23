@@ -10,13 +10,82 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
+type DummyParams struct {
+	Param1 string `form:"p1, doc for p1"`
+	Param2 int    `form:"p2, doc for p2"`
+}
+
+type DummyListParams struct {
+	Limit int `form:"limit, limit doc"`
+}
+
+type DummyComplexParams struct {
+	DummyListParams
+	Param3 bool `form:"p3"`
+}
+
 func TestReadRouteInfo(t *testing.T) {
 	for _, test := range []struct {
-		name    string
-		data    string
-		want    []*RouteInfo
-		wantErr bool
+		name      string
+		data      string
+		paramsMap map[string][]QueryParam
+		want      []*RouteInfo
+		wantErr   bool
 	}{
+		{
+			name: "with query params",
+			data: `
+//api:route /v1/dummy
+//api:desc Dummy route.
+//api:params DummyParams
+//api:response DummyResponse
+`,
+			paramsMap: map[string][]QueryParam{
+				"DummyParams": {
+					{Name: "p1", Type: "string", Doc: "doc for p1"},
+					{Name: "p2", Type: "int", Doc: "doc for p2"},
+				},
+			},
+			want: []*RouteInfo{
+				{
+					Route:    "/v1/dummy",
+					Desc:     "Dummy route.",
+					Params:   "DummyParams",
+					Response: "DummyResponse",
+					QueryParams: []QueryParam{
+						{Name: "p1", Type: "string", Doc: "doc for p1"},
+						{Name: "p2", Type: "int", Doc: "doc for p2"},
+					},
+				},
+			},
+		},
+		{
+			name: "with complex query params",
+			data: `
+//api:route /v1/dummy-complex
+//api:desc Dummy complex route.
+//api:params DummyComplexParams
+//api:response DummyComplexResponse
+`,
+			paramsMap: map[string][]QueryParam{
+				"DummyComplexParams": {
+					{Name: "limit", Type: "int", Doc: "limit doc"},
+					{Name: "p3", Type: "bool", Doc: ""},
+				},
+			},
+			want: []*RouteInfo{
+				{
+					Route:    "/v1/dummy-complex",
+					Desc:     "Dummy complex route.",
+					Params:   "DummyComplexParams",
+					Response: "DummyComplexResponse",
+					QueryParams: []QueryParam{
+						{Name: "limit", Type: "int", Doc: "limit doc"},
+						{Name: "p3", Type: "bool", Doc: ""},
+					},
+				},
+			},
+		},
 		{
 			name: "correct",
 			data: `
@@ -131,7 +200,7 @@ func TestReadRouteInfo(t *testing.T) {
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			got, err := readRouteInfo([]byte(test.data))
+			got, err := readRouteInfo([]byte(test.data), test.paramsMap)
 			if (err != nil) != test.wantErr {
 				t.Errorf("ReadRouteInfo() error = %v, wantErr %v", err, test.wantErr)
 				return
@@ -149,5 +218,45 @@ func TestRouteInfos(t *testing.T) {
 	// Just check that there are no errors.
 	if _, err := RouteInfos(); err != nil {
 		t.Fatalf("RouteInfos failed: %v", err)
+	}
+}
+
+func TestParseParamsAST(t *testing.T) {
+	data := `
+package api
+type DummyParams struct {
+	// doc for p1
+	Param1 string ` + "`" + `form:"p1"` + "`" + `
+	Param2 int    ` + "`" + `form:"p2"` + "`" + `
+}
+type DummyComplexParams struct {
+	DummyListParams
+	Param3 bool ` + "`" + `form:"p3"` + "`" + `
+}
+type DummyListParams struct {
+	// limit doc
+	Limit int ` + "`" + `form:"limit"` + "`" + `
+}
+`
+	want := map[string][]QueryParam{
+		"DummyParams": {
+			{Name: "p1", Type: "string", Doc: "doc for p1"},
+			{Name: "p2", Type: "int", Doc: ""},
+		},
+		"DummyListParams": {
+			{Name: "limit", Type: "int", Doc: "limit doc"},
+		},
+		"DummyComplexParams": {
+			{Name: "limit", Type: "int", Doc: "limit doc"},
+			{Name: "p3", Type: "bool", Doc: ""},
+		},
+	}
+
+	got, err := parseParamsFile([]byte(data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("parseParams mismatch (-want +got):\n%s", diff)
 	}
 }

@@ -13,14 +13,19 @@ import (
 
 // ListParams are common pagination and filtering parameters.
 type ListParams struct {
-	Limit  int    `form:"limit"`
-	Token  string `form:"token"`
+	// max number of items to return
+	Limit int `form:"limit"`
+	// where to resume listing
+	Token string `form:"token"`
+	// include only items matching filter
 	Filter string `form:"filter"`
 }
 
 // PackageParams are query parameters for /v1/package/{path}.
 type PackageParams struct {
-	Module   string `form:"module"`
+	// module path
+	Module string `form:"module"`
+	// module version
 	Version  string `form:"version"`
 	GOOS     string `form:"goos"`
 	GOARCH   string `form:"goarch"`

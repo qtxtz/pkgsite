@@ -33,12 +33,34 @@
     .Api-label {
       font-weight: 600;
     }
+    .Api-paramsTable {
+      border-collapse: collapse;
+      margin-top: 0.5rem;
+      width: 100%;
+    }
+    .Api-paramsTable th {
+      text-align: left;
+      padding: 0.25rem 0.5rem;
+      font-weight: 600;
+    }
+    .Api-paramsTable th:first-child {
+      padding-left: 0;
+    }
+    .Api-paramsTable td {
+      border-top: var(--border);
+      padding: 0.25rem 0.5rem;
+      vertical-align: top;
+    }
+    .Api-paramsTable td:first-child {
+      padding-left: 0;
+    }
   </style>
   <main class="go-Container" id="main-content">
     <div class="go-Content">
       <h1 data-test-id="api-heading">API Documentation</h1>
       <p>
         Pkgsite provides a JSON API for accessing information about Go packages and modules.
+
         All routes return a JSON response.
       </p>
       <ul class="Api-list">
@@ -47,8 +69,29 @@
             <div class="Api-route"><code>{{.Route}}</code></div>
             <p>{{.Desc}}</p>
             <div class="Api-details">
-              <span class="Api-label">Parameters:</span>
-              <span><code><a href="https://pkg.go.dev/golang.org/x/pkgsite/internal/api#{{.Params}}">{{.Params}}</a></code></span>
+              {{if .QueryParams}}
+                <span class="Api-label">Parameters:</span>
+                <span>
+                    <table class="Api-paramsTable">
+                      <thead>
+                        <tr>
+                          <th>Name</th>
+                          <th>Type</th>
+                          <th>Description</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                          {{range .QueryParams}}
+                            <tr>
+                              <td><code>{{.Name}}</code></td>
+                              <td><code>{{.Type}}</code></td>
+                              <td>{{.Doc}}</td>
+                            </tr>
+                          {{end}}
+                      </tbody>
+                    </table>
+                </span>
+              {{end}} {{/* if .QueryParams */}}
               <span class="Api-label">Response:</span>
               <span><code>
                 {{if .ResponsePaginatedType}}

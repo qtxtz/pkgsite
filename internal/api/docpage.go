@@ -10,11 +10,22 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"reflect"
 	"regexp"
 	"strings"
 	"sync"
 	"unicode"
 )
+
+// QueryParam contains information about a query parameter.
+type QueryParam struct {
+	Name string
+	Type string
+	Doc  string
+}
 
 // RouteInfo contains documentation information for an API route.
 type RouteInfo struct {
@@ -24,19 +35,138 @@ type RouteInfo struct {
 	Response              string
 	ResponsePaginatedType string
 	LinkPaginatedType     bool
+	QueryParams           []QueryParam
 }
+
+// parseParamsFile parses a Go source file containing parameter structs
+// and returns a map from struct name to its query parameters.
+func parseParamsFile(data []byte) (map[string][]QueryParam, error) {
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, "", data, parser.ParseComments)
+	if err != nil {
+		return nil, err
+	}
+
+	// Do this in two phases, so we can find embedded structs even if
+	// they're later in the file.
+
+	// Phase 1: collect params structs.
+	structs := make(map[string]*ast.StructType)
+	for _, decl := range file.Decls {
+		genDecl, ok := decl.(*ast.GenDecl)
+		if !ok || genDecl.Tok != token.TYPE {
+			continue
+		}
+		for _, spec := range genDecl.Specs {
+			typeSpec, ok := spec.(*ast.TypeSpec)
+			if !ok || !strings.HasSuffix(typeSpec.Name.Name, "Params") {
+				continue
+			}
+			structType, ok := typeSpec.Type.(*ast.StructType)
+			if !ok {
+				continue
+			}
+			structs[typeSpec.Name.Name] = structType
+		}
+	}
+
+	// Phase 2: build query params.
+	paramsMap := make(map[string][]QueryParam)
+
+	// processStruct builds the query params for the given struct
+	// and puts them in paramsMap.
+	var processStruct func(string, *ast.StructType)
+	processStruct = func(name string, st *ast.StructType) {
+		var params []QueryParam
+		for _, field := range st.Fields.List {
+			// field.Names is nil for embedded structs.
+			if field.Names == nil {
+				typeName := field.Type.(*ast.Ident).Name
+
+				if paramsMap[typeName] == nil {
+					est := structs[typeName]
+					if est == nil {
+						panic(fmt.Sprintf("unknown embedded type %q", typeName))
+					}
+					// This recursion must bottom out because embeddings
+					// can't form a cycle.
+					processStruct(typeName, est)
+				}
+				params = append(params, paramsMap[typeName]...)
+				continue
+			}
+
+			tag := ""
+			if field.Tag != nil {
+				tag = field.Tag.Value
+			}
+			formName := extractFormName(tag)
+			if formName == "" {
+				continue
+			}
+
+			doc := ""
+			if field.Doc != nil {
+				doc = strings.TrimSpace(field.Doc.Text())
+			}
+
+			params = append(params, QueryParam{
+				Name: formName,
+				Type: exprToString(field.Type),
+				Doc:  doc,
+			})
+
+		}
+		paramsMap[name] = params
+	}
+
+	for name, structType := range structs {
+		processStruct(name, structType)
+	}
+	return paramsMap, nil
+}
+
+// extractFormName extracts the query parameter name from a struct field's form tag.
+func extractFormName(tag string) string {
+	if tag == "" {
+		return ""
+	}
+	tag = strings.Trim(tag, "`")
+	structTag := reflect.StructTag(tag)
+	formVal := structTag.Get("form")
+	name, _, _ := strings.Cut(formVal, ",")
+	return name
+}
+
+func exprToString(expr ast.Expr) string {
+	switch e := expr.(type) {
+	case *ast.Ident:
+		return e.Name
+	case *ast.ArrayType:
+		return "[]" + exprToString(e.Elt)
+	default:
+		return fmt.Sprintf("%T", expr)
+	}
+}
+
+//go:embed params.go
+var paramsGo []byte
 
 //go:embed api.go
 var apiGo []byte
 
 var RouteInfos = sync.OnceValues(func() ([]*RouteInfo, error) {
-	return readRouteInfo(apiGo)
+	paramsMap, err := parseParamsFile(paramsGo)
+	if err != nil {
+		return nil, err
+	}
+	return readRouteInfo(apiGo, paramsMap)
 })
 
 var apiRE = regexp.MustCompile(`//\s*api:(\S+)\s+(.*)`)
 
 // readRouteInfo reads the provided Go source data and returns documentation information for all routes.
-func readRouteInfo(data []byte) ([]*RouteInfo, error) {
+func readRouteInfo(data []byte, paramsMap map[string][]QueryParam) ([]*RouteInfo, error) {
 	var routes []*RouteInfo
 	var current *RouteInfo
 
@@ -95,6 +225,9 @@ func readRouteInfo(data []byte) ([]*RouteInfo, error) {
 				return nil, fmt.Errorf("duplicate api:params in route %q", current.Route)
 			}
 			current.Params = val
+			if qps, ok := paramsMap[val]; ok {
+				current.QueryParams = qps
+			}
 		case "response":
 			if current == nil {
 				return nil, fmt.Errorf("saw api:response before api:route")
