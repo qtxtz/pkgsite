@@ -106,19 +106,21 @@ func testAPI(t *testing.T, newTestingDataSource func(t *testing.T) internal.Test
 	})
 }
 
-func testServePackage(t *testing.T, ds internal.TestingDataSource) {
+// TODO(jba): add to the set of modules until all tests pass.
+// Then call once at the top of TestAPI.
+func insertModules(t *testing.T, ds internal.TestingDataSource) {
 	const (
-		pkgPath     = "example.com/a/b"
-		modulePath1 = "example.com/a"
-		modulePath2 = "example.com/a/b"
-		version     = "v1.2.3"
+		pkgPath        = "example.com/a/b"
+		modulePath1    = "example.com/a"
+		modulePath2    = "example.com/a/b"
+		earlierVersion = "v1.2.3"
+		latestVersion  = "v1.2.4"
 	)
-
 	ds.MustInsertModule(t, &internal.Module{
 		ModuleInfo: internal.ModuleInfo{
 			ModulePath:    "example.com",
-			Version:       version,
-			LatestVersion: "v1.2.4",
+			Version:       earlierVersion,
+			LatestVersion: latestVersion,
 		},
 		Licenses: sample.Licenses(),
 		Units: []*internal.Unit{{
@@ -126,8 +128,8 @@ func testServePackage(t *testing.T, ds internal.TestingDataSource) {
 				Path: "example.com/pkg",
 				ModuleInfo: internal.ModuleInfo{
 					ModulePath:        "example.com",
-					Version:           version,
-					LatestVersion:     "v1.2.4",
+					Version:           earlierVersion,
+					LatestVersion:     latestVersion,
 					IsRedistributable: true,
 				},
 				Name: "pkg",
@@ -138,15 +140,14 @@ func testServePackage(t *testing.T, ds internal.TestingDataSource) {
 			IsRedistributable: true,
 		}},
 	})
-
 	for _, mp := range []string{modulePath1, modulePath2} {
 		u := &internal.Unit{
 			UnitMeta: internal.UnitMeta{
 				Path: pkgPath,
 				ModuleInfo: internal.ModuleInfo{
 					ModulePath:        mp,
-					Version:           version,
-					LatestVersion:     version,
+					Version:           earlierVersion,
+					LatestVersion:     earlierVersion,
 					IsRedistributable: true,
 				},
 				Name: "b",
@@ -157,8 +158,8 @@ func testServePackage(t *testing.T, ds internal.TestingDataSource) {
 		ds.MustInsertModule(t, &internal.Module{
 			ModuleInfo: internal.ModuleInfo{
 				ModulePath:    mp,
-				Version:       version,
-				LatestVersion: version,
+				Version:       earlierVersion,
+				LatestVersion: earlierVersion,
 			},
 			Units: []*internal.Unit{u},
 		})
@@ -167,50 +168,74 @@ func testServePackage(t *testing.T, ds internal.TestingDataSource) {
 	ds.MustInsertModule(t, &internal.Module{
 		ModuleInfo: internal.ModuleInfo{
 			ModulePath:    "example.com",
-			Version:       "v1.2.4",
-			LatestVersion: "v1.2.4",
+			Version:       latestVersion,
+			LatestVersion: latestVersion,
 		},
 		Units: []*internal.Unit{{
 			UnitMeta: internal.UnitMeta{
 				Path: "example.com/pkg",
 				ModuleInfo: internal.ModuleInfo{
 					ModulePath:    "example.com",
-					Version:       "v1.2.4",
-					LatestVersion: "v1.2.4",
+					Version:       latestVersion,
+					LatestVersion: latestVersion,
 				},
 				Name: "pkg",
 			},
-			Documentation:     []*internal.Documentation{sample.Documentation("linux", "amd64", sample.DocContents)},
+			IsRedistributable: true,
+			Documentation: []*internal.Documentation{sample.DocumentationWithTest("linux", "amd64", `
+		// Package p is a package.
+		package p
+		var V int
+		`, `
+		package p
+	    func Example() {
+			fmt.Println("hello")
+            // Output: hello
+        }`)},
+		}},
+	})
+
+	// Deprecation.
+	// The fake data source uses ModuleInfo.Deprecated, but the DB
+	// requires a go.mod file.
+	modInfo := internal.ModuleInfo{
+		ModulePath:    "example.com/d/e",
+		Version:       "v1.2.3",
+		LatestVersion: "v1.2.3",
+		Deprecated:    true,
+	}
+	ds.MustInsertModuleGoMod(context.TODO(), t, &internal.Module{
+		ModuleInfo: modInfo,
+		Units: []*internal.Unit{{
+			UnitMeta: internal.UnitMeta{
+				Path:       "example.com/d/e",
+				ModuleInfo: modInfo,
+				Name:       "pkg",
+			},
+			IsRedistributable: true,
+		}},
+	}, `module example.com/d/e // Deprecated: bad`)
+	// The DB needs the above go.mod contents to know that the module
+	// is deprecated. It doesn't look at ModuleInfo.Deprecated.
+	modInfo.ModulePath = "example.com/d"
+	modInfo.Deprecated = false
+	ds.MustInsertModule(t, &internal.Module{
+		ModuleInfo: modInfo,
+		Units: []*internal.Unit{{
+			UnitMeta: internal.UnitMeta{
+				Path:       "example.com/d/e",
+				ModuleInfo: modInfo,
+				Name:       "pkg",
+			},
 			IsRedistributable: true,
 		}},
 	})
 
-	ds.MustInsertModule(t, &internal.Module{
-		ModuleInfo: internal.ModuleInfo{
-			ModulePath:    "example.com/ex",
-			Version:       "v1.0.0",
-			LatestVersion: "v1.0.0",
-		},
-		Units: []*internal.Unit{{
-			UnitMeta: internal.UnitMeta{
-				Path: "example.com/ex/pkg",
-				ModuleInfo: internal.ModuleInfo{
-					ModulePath:    "example.com/ex",
-					Version:       "v1.0.0",
-					LatestVersion: "v1.0.0",
-				},
-				Name: "pkg",
-			},
-			IsRedistributable: true,
-			Documentation: []*internal.Documentation{sample.DocumentationWithExamples("linux", "amd64", "", `
-			import "fmt"
-			func Example() {
-			fmt.Println("hello")
-			// Output: hello
-			}
-			`)},
-		}},
-	})
+}
+
+func testServePackage(t *testing.T, ds internal.TestingDataSource) {
+	insertModules(t, ds)
+	// TODO(jba): call insertModules in other tests.
 
 	for _, test := range []struct {
 		name       string
@@ -226,7 +251,7 @@ func testServePackage(t *testing.T, ds internal.TestingDataSource) {
 			want: &api.Package{
 				Path:          "example.com/pkg",
 				ModulePath:    "example.com",
-				ModuleVersion: version,
+				ModuleVersion: "v1.2.3",
 				Synopsis:      "This is a package synopsis for GOOS=linux, GOARCH=amd64",
 				IsLatest:      false,
 				GOOS:          "linux",
@@ -251,9 +276,9 @@ func testServePackage(t *testing.T, ds internal.TestingDataSource) {
 			url:        "/v1/package/example.com/a/b?version=v1.2.3&module=example.com/a",
 			wantStatus: http.StatusOK,
 			want: &api.Package{
-				Path:          pkgPath,
-				ModulePath:    modulePath1,
-				ModuleVersion: version,
+				Path:          "example.com/a/b",
+				ModulePath:    "example.com/a",
+				ModuleVersion: "v1.2.3",
 				Synopsis:      "This is a package synopsis for GOOS=linux, GOARCH=amd64",
 				IsLatest:      true,
 				GOOS:          "linux",
@@ -267,7 +292,7 @@ func testServePackage(t *testing.T, ds internal.TestingDataSource) {
 			want: &api.Package{
 				Path:          "example.com/pkg",
 				ModulePath:    "example.com",
-				ModuleVersion: version,
+				ModuleVersion: "v1.2.3",
 				Synopsis:      "This is a package synopsis for GOOS=linux, GOARCH=amd64",
 				IsLatest:      false,
 				GOOS:          "linux",
@@ -295,7 +320,7 @@ func testServePackage(t *testing.T, ds internal.TestingDataSource) {
 			want: &api.Package{
 				Path:          "example.com/pkg",
 				ModulePath:    "example.com",
-				ModuleVersion: version,
+				ModuleVersion: "v1.2.3",
 				Synopsis:      "This is a package synopsis for GOOS=linux, GOARCH=amd64",
 				GOOS:          "linux",
 				GOARCH:        "amd64",
@@ -304,22 +329,22 @@ func testServePackage(t *testing.T, ds internal.TestingDataSource) {
 		},
 		{
 			name:       "doc with examples",
-			url:        "/v1/package/example.com/ex/pkg?version=v1.0.0&doc=text&examples=true",
+			url:        "/v1/package/example.com/pkg?version=v1.2.4&doc=text&examples=true",
 			wantStatus: http.StatusOK,
 			want: &api.Package{
-				Path:          "example.com/ex/pkg",
-				ModulePath:    "example.com/ex",
-				ModuleVersion: "v1.0.0",
+				Path:          "example.com/pkg",
+				ModulePath:    "example.com",
+				ModuleVersion: "v1.2.4",
 				Synopsis:      "This is a package synopsis for GOOS=linux, GOARCH=amd64",
 				IsLatest:      true,
 				GOOS:          "linux",
 				GOARCH:        "amd64",
-				Docs:          "package pkg\n\nPackage pkg is a package.\n\nExample:\n\t{\n\t\tfmt.Println(\"hello\")\n\t}\n\n\tOutput:\n\thello\n\n",
+				Docs:          "package p\n\nPackage p is a package.\n\nExample:\n\t{\n\t\tfmt.Println(\"hello\")\n\t}\n\n\tOutput:\n\thello\n\nVARIABLES\n\nvar V int\n\n",
 			},
 		},
 		{
-			name:       "examples without doc (returns 400)",
-			url:        "/v1/package/example.com/ex/pkg?version=v1.0.0&examples=true",
+			name:       "examples without doc",
+			url:        "/v1/package/example.com/pkg?version=v1.2.3&examples=true",
 			wantStatus: http.StatusBadRequest,
 			want: &api.Error{
 				Code:    http.StatusBadRequest,
@@ -334,17 +359,17 @@ func testServePackage(t *testing.T, ds internal.TestingDataSource) {
 		},
 		{
 			name:       "doc without examples",
-			url:        "/v1/package/example.com/ex/pkg?version=v1.0.0&doc=text&examples=false",
+			url:        "/v1/package/example.com/pkg?version=v1.2.4&doc=text&examples=false",
 			wantStatus: http.StatusOK,
 			want: &api.Package{
-				Path:          "example.com/ex/pkg",
-				ModulePath:    "example.com/ex",
-				ModuleVersion: "v1.0.0",
+				Path:          "example.com/pkg",
+				ModulePath:    "example.com",
+				ModuleVersion: "v1.2.4",
 				Synopsis:      "This is a package synopsis for GOOS=linux, GOARCH=amd64",
 				IsLatest:      true,
 				GOOS:          "linux",
 				GOARCH:        "amd64",
-				Docs:          "package pkg\n\nPackage pkg is a package.\n\n",
+				Docs:          "package p\n\nPackage p is a package.\n\nVARIABLES\n\nvar V int\n\n",
 			},
 		},
 		{
@@ -363,7 +388,7 @@ func testServePackage(t *testing.T, ds internal.TestingDataSource) {
 			want: &api.Package{
 				Path:          "example.com/pkg",
 				ModulePath:    "example.com",
-				ModuleVersion: version,
+				ModuleVersion: "v1.2.3",
 				Synopsis:      "This is a package synopsis for GOOS=linux, GOARCH=amd64",
 				GOOS:          "linux",
 				GOARCH:        "amd64",
@@ -377,7 +402,7 @@ func testServePackage(t *testing.T, ds internal.TestingDataSource) {
 			want: &api.Package{
 				Path:          "example.com/pkg",
 				ModulePath:    "example.com",
-				ModuleVersion: version,
+				ModuleVersion: "v1.2.3",
 				Synopsis:      "This is a package synopsis for GOOS=linux, GOARCH=amd64",
 				IsLatest:      false,
 				GOOS:          "linux",
@@ -398,12 +423,12 @@ func testServePackage(t *testing.T, ds internal.TestingDataSource) {
 			want: &api.Package{
 				Path:          "example.com/pkg",
 				ModulePath:    "example.com",
-				ModuleVersion: version,
+				ModuleVersion: "v1.2.3",
 				Synopsis:      "This is a package synopsis for GOOS=linux, GOARCH=amd64",
 				IsLatest:      false,
 				GOOS:          "linux",
 				GOARCH:        "amd64",
-				Imports:       []string{pkgPath},
+				Imports:       []string{"example.com/a/b"},
 			},
 		},
 		{
@@ -427,51 +452,14 @@ func testServePackage(t *testing.T, ds internal.TestingDataSource) {
 		},
 		{
 			name:       "deprecation filtering",
-			url:        "/v1/package/example.com/a/b?version=v1.2.3",
+			url:        "/v1/package/example.com/d/e?version=v1.2.3",
 			wantStatus: http.StatusOK,
 			want: &api.Package{
-				Path:          pkgPath,
-				ModulePath:    modulePath2, // picked because modulePath1 is deprecated
-				ModuleVersion: version,
-				Synopsis:      "Synopsis for " + modulePath2,
+				Path:          "example.com/d/e",
+				ModulePath:    "example.com/d", // picked because example.com/d/e is deprecated
+				ModuleVersion: "v1.2.3",
 				IsLatest:      true,
-				GOOS:          "linux",
-				GOARCH:        "amd64",
 			},
-			overrideDS: func() internal.DataSource {
-				newDS := fakedatasource.New()
-				for _, mp := range []string{modulePath1, modulePath2} {
-					u := &internal.Unit{
-						UnitMeta: internal.UnitMeta{
-							Path: pkgPath,
-							ModuleInfo: internal.ModuleInfo{
-								ModulePath:    mp,
-								Version:       version,
-								LatestVersion: version,
-								Deprecated:    mp == modulePath1,
-							},
-							Name: "b",
-						},
-						Documentation: []*internal.Documentation{
-							{
-								GOOS:     "linux",
-								GOARCH:   "amd64",
-								Synopsis: "Synopsis for " + mp,
-							},
-						},
-					}
-					newDS.MustInsertModule(t, &internal.Module{
-						ModuleInfo: internal.ModuleInfo{
-							ModulePath:    mp,
-							Version:       version,
-							LatestVersion: version,
-							Deprecated:    mp == modulePath1,
-						},
-						Units: []*internal.Unit{u},
-					})
-				}
-				return newDS
-			}(),
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -556,7 +544,7 @@ func testServeModule(t *testing.T, ds internal.TestingDataSource) {
 			wantStatus: http.StatusOK,
 			want: &api.Module{
 				Path:              modulePath,
-				Version:           version,
+				Version:           "v1.2.3",
 				IsRedistributable: true,
 				HasGoMod:          true,
 				RepoURL:           "https://example.com",
@@ -599,7 +587,7 @@ func testServeModule(t *testing.T, ds internal.TestingDataSource) {
 			wantStatus: http.StatusOK,
 			want: &api.Module{
 				Path:              modulePath,
-				Version:           version,
+				Version:           "v1.2.3",
 				IsRedistributable: true,
 				HasGoMod:          true,
 				RepoURL:           "https://example.com",
@@ -615,7 +603,7 @@ func testServeModule(t *testing.T, ds internal.TestingDataSource) {
 			wantStatus: http.StatusOK,
 			want: &api.Module{
 				Path:              modulePath,
-				Version:           version,
+				Version:           "v1.2.3",
 				IsRedistributable: true,
 				HasGoMod:          true,
 				RepoURL:           "https://example.com",
@@ -755,14 +743,13 @@ func testServeModuleVersions(t *testing.T, ds internal.TestingDataSource) {
 func testServeModulePackages(t *testing.T, ds internal.TestingDataSource) {
 	const (
 		modulePath = "example.com"
-		version    = "v1.0.0"
 	)
 
 	ds.MustInsertModule(t, &internal.Module{
 		ModuleInfo: internal.ModuleInfo{
 			ModulePath:        modulePath,
-			Version:           version,
-			LatestVersion:     version,
+			Version:           "v1.2.3",
+			LatestVersion:     "v1.2.3",
 			IsRedistributable: true,
 		},
 		Units: []*internal.Unit{
@@ -797,14 +784,14 @@ func testServeModulePackages(t *testing.T, ds internal.TestingDataSource) {
 	}{
 		{
 			name:       "all packages",
-			url:        "/v1/packages/example.com?version=v1.0.0",
+			url:        "/v1/packages/example.com?version=v1.2.3",
 			wantStatus: http.StatusOK,
 			wantCount:  2,
 			wantTotal:  2,
 		},
 		{
 			name:       "module not found",
-			url:        "/v1/packages/nonexistent.com?version=v1.0.0",
+			url:        "/v1/packages/nonexistent.com?version=v1.2.3",
 			wantStatus: http.StatusNotFound,
 			want:       &api.Error{Code: 404, Message: "not found"},
 		},
@@ -816,21 +803,21 @@ func testServeModulePackages(t *testing.T, ds internal.TestingDataSource) {
 		},
 		{
 			name:       "filtering",
-			url:        "/v1/packages/example.com?version=v1.0.0&filter=sub",
+			url:        "/v1/packages/example.com?version=v1.2.3&filter=sub",
 			wantStatus: http.StatusOK,
 			wantCount:  1,
 			wantTotal:  1,
 		},
 		{
 			name:       "filtering synopsis",
-			url:        "/v1/packages/example.com?version=v1.0.0&filter=pkg2",
+			url:        "/v1/packages/example.com?version=v1.2.3&filter=pkg2",
 			wantStatus: http.StatusOK,
 			wantCount:  1,
 			wantTotal:  1,
 		},
 		{
 			name:       "limit and token",
-			url:        "/v1/packages/example.com?version=v1.0.0&limit=1",
+			url:        "/v1/packages/example.com?version=v1.2.3&limit=1",
 			wantStatus: http.StatusOK,
 			wantCount:  1,
 			wantTotal:  2,
@@ -838,7 +825,7 @@ func testServeModulePackages(t *testing.T, ds internal.TestingDataSource) {
 		},
 		{
 			name:       "next page",
-			url:        "/v1/packages/example.com?version=v1.0.0&limit=1&token=1",
+			url:        "/v1/packages/example.com?version=v1.2.3&limit=1&token=1",
 			wantStatus: http.StatusOK,
 			wantCount:  1,
 			wantTotal:  2,
@@ -1196,13 +1183,12 @@ func testServePackageImportedBy(t *testing.T, ds internal.TestingDataSource) {
 	const (
 		pkgPath    = "example.com/pkg"
 		modulePath = "example.com"
-		version    = "v1.0.0"
 	)
 
 	modInfo := internal.ModuleInfo{
 		ModulePath:        modulePath,
-		Version:           version,
-		LatestVersion:     version,
+		Version:           "v1.2.3",
+		LatestVersion:     "v1.2.3",
 		IsRedistributable: true,
 	}
 	ds.MustInsertModule(t, &internal.Module{
@@ -1221,8 +1207,8 @@ func testServePackageImportedBy(t *testing.T, ds internal.TestingDataSource) {
 
 	modInfo = internal.ModuleInfo{
 		ModulePath:        "example.com/mod",
-		Version:           version,
-		LatestVersion:     version,
+		Version:           "v1.2.3",
+		LatestVersion:     "v1.2.3",
 		IsRedistributable: true,
 	}
 	ds.MustInsertModule(t, &internal.Module{
@@ -1249,7 +1235,7 @@ func testServePackageImportedBy(t *testing.T, ds internal.TestingDataSource) {
 	}{
 		{
 			name:       "all imported by",
-			url:        "/v1/imported-by/example.com/pkg?version=v1.0.0",
+			url:        "/v1/imported-by/example.com/pkg?version=v1.2.3",
 			wantStatus: http.StatusOK,
 			wantCount:  1,
 		},

@@ -43,6 +43,9 @@ func (ds *FakeDataSource) MustInsertModule(t *testing.T, m *internal.Module) {
 		t.Fatalf("error returned by InsertModule: %v", err)
 	}
 }
+func (ds *FakeDataSource) MustInsertModuleGoMod(_ context.Context, t *testing.T, m *internal.Module, _ string) {
+	ds.MustInsertModule(t, m)
+}
 
 // compareLicenses reports whether i < j according to our license sorting
 // semantics. This is what the postgres database uses to sort licenses.
@@ -204,7 +207,6 @@ func (ds *FakeDataSource) getModule(modulePath, vers string) *internal.Module {
 	if vers == version.Latest {
 		return ds.getLatestModule(modulePath)
 	}
-
 	return ds.modules[module.Version{Path: modulePath, Version: vers}]
 }
 

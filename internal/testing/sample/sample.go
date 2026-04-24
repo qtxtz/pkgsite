@@ -376,20 +376,24 @@ func constructFullPath(modulePath, suffix string) string {
 	return suffix
 }
 
-// Documentation returns a Documentation value for the given Go source.
+// Documentation returns a Documentation value for the given Go sources.
 // It panics if there are errors parsing or encoding the source.
 func Documentation(goos, goarch, fileContents string) *internal.Documentation {
-	return documentation(goos, goarch, map[string]string{"sample.go": fileContents})
+	return DocumentationWithTest(goos, goarch, fileContents, "")
 }
 
-// DocumentationWithExamples returns a Documentation value for the given package
-// documentation and example code.
+// DocumentationWithText returns a Documentation value for the given Go sources.
+// The fileContents arg is the contents of a non-test file.
+// The testFileContents arg is the contents of a non-test file.
 // It panics if there are errors parsing or encoding the source.
-func DocumentationWithExamples(goos, goarch, pkgDoc, exampleCode string) *internal.Documentation {
-	return documentation(goos, goarch, map[string]string{
-		"pkg.go":      "// Package pkg is a package.\npackage pkg\n" + pkgDoc,
-		"pkg_test.go": "package pkg\n" + exampleCode,
-	})
+func DocumentationWithTest(goos, goarch, fileContents, testFileContents string) *internal.Documentation {
+	m := map[string]string{
+		"sample.go": fileContents,
+	}
+	if testFileContents != "" {
+		m["sample_test.go"] = testFileContents
+	}
+	return documentation(goos, goarch, m)
 }
 
 func documentation(goos, goarch string, files map[string]string) *internal.Documentation {

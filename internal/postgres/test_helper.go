@@ -151,7 +151,7 @@ func (db *DB) MustInsertModule(t *testing.T, m *internal.Module) {
 	mustInsertModule(t, db, m, "")
 }
 
-func (db *DB) MustInsertModuleGoMod(ctx context.Context, t *testing.T, m *internal.Module, goMod string) {
+func (db *DB) MustInsertModuleGoMod(_ context.Context, t *testing.T, m *internal.Module, goMod string) {
 	mustInsertModule(t, db, m, goMod)
 }
 

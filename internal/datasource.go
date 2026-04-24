@@ -115,6 +115,12 @@ type TestingDataSource interface {
 	// MustInsertModule inserts m into the DataSource.
 	// It calls t.Fatal if there is an error.
 	MustInsertModule(t *testing.T, m *Module)
+
+	// MustInsertModule inserts m into the DataSource
+	// with a go.mod file.
+	// It calls t.Fatal if there is an error.
+	// TODO(jba); remove context arg.
+	MustInsertModuleGoMod(_ context.Context, t *testing.T, m *Module, goMod string)
 }
 
 type SearchSupport int
