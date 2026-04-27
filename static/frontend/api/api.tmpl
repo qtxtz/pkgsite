@@ -59,10 +59,50 @@
     <div class="go-Content">
       <h1 data-test-id="api-heading">API Documentation</h1>
       <p>
-        Pkgsite provides a JSON API for accessing information about Go packages and modules.
-
-        All routes return a JSON response.
+        Pkgsite provides a JSON API for accessing information about
+        Go packages and modules.
       </p>
+
+      <h2>Requests</h2>
+      <p>
+      All requests are GET requests whose first URL segment selects the request
+      type.
+      Except for <code>search</code>, the remaining segments
+      specify a module or package path. Additional arguments
+      are specified as query parameters.
+      </p>
+      <p>
+      Package paths are ambiguous: the same path <code>a/b/c</code> could be package
+      <code>c</code> in module <code>a/b</code>
+      or package <code>b/c</code> in module <code>a</code>.
+      If both exist, the API returns an error with a list of possible modules in its
+      <code>candidates</code> field.
+      Make a follow-up request with the <code>module</code> query parameter to
+      disambiguate. (Note: this behavior differs from the pkgsite UI, which selects
+      the longest matching module path.)
+      </p>
+      <p>Some routes accept an optional <code>version</code> query parameter.
+      If missing, the latest version is chosen.</p>
+
+      <p>Some routes accept optional <code>GOOS</code> and <code>GOARCH</code>
+      query parameters to select the desired build context of the documentation.
+      If omitted, the default documentation build context is selected,
+      typically <code>linux/amd64</code>.
+      </p>
+
+      <p>Some routes accept a <code>filter</code>, which selects only
+      the items whose fields contain the filter as a substring. The
+      documentation for each route specifies the filter behavior.
+      </p>
+
+      <h2>Responses</h2>
+      <p>
+        All routes return a JSON response.
+        You can find a link to the corresponding Go type for a route in the documentation below.
+        Errors are also returned as a JSON object, whose <code>message</code> field
+        contains the error message.
+      </p>
+      <h2>Routes</h2>
       <ul class="Api-list">
         {{range .Routes}}
           <li class="Api-item">

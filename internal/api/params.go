@@ -25,37 +25,53 @@ type ListParams struct {
 type PackageParams struct {
 	// module path
 	Module string `form:"module"`
-	// module version
-	Version  string `form:"version"`
-	GOOS     string `form:"goos"`
-	GOARCH   string `form:"goarch"`
-	Doc      string `form:"doc"`
-	Examples bool   `form:"examples"`
-	Imports  bool   `form:"imports"`
-	Licenses bool   `form:"licenses"`
+	// module version (latest if empty)
+	Version string `form:"version"`
+	// GOOS of documentation build context
+	GOOS string `form:"goos"`
+	// GOARCH of documentation build context
+	GOARCH string `form:"goarch"`
+	// Documentation format: text, html, md or markdown.
+	// If omitted, documentation is not returned.
+	Doc string `form:"doc"`
+	// Whether to include examples with the returned documentation.
+	Examples bool `form:"examples"`
+	// Whether to include the packages that this one imports.
+	Imports bool `form:"imports"`
+	// Whether to include licenses in the result.
+	Licenses bool `form:"licenses"`
 }
 
 // SymbolsParams are query parameters for /v1/symbols/{path}.
 type SymbolsParams struct {
-	Module  string `form:"module"`
+	// module path
+	Module string `form:"module"`
+	// module version (latest if empty)
 	Version string `form:"version"`
-	GOOS    string `form:"goos"`
-	GOARCH  string `form:"goarch"`
+	// GOOS of documentation build context
+	GOOS string `form:"goos"`
+	// GOARCH of documentation build context
+	GOARCH string `form:"goarch"`
 	ListParams
 }
 
 // ImportedByParams are query parameters for /v1/imported-by/{path}.
 type ImportedByParams struct {
-	Module  string `form:"module"`
+	// module path
+	Module string `form:"module"`
+	// module version (latest if empty)
 	Version string `form:"version"`
 	ListParams
 }
 
 // ModuleParams are query parameters for /v1/module/{path}.
 type ModuleParams struct {
-	Version  string `form:"version"`
-	Licenses bool   `form:"licenses"`
-	Readme   bool   `form:"readme"`
+	// module version (latest if empty)
+	Version string `form:"version"`
+	// Whether to include licenses in the result.
+	Licenses bool `form:"licenses"`
+	// Whether to include the README in the result.
+	Readme bool `form:"readme"`
 }
 
 // VersionsParams are query parameters for /v1/versions/{path}.
@@ -65,19 +81,24 @@ type VersionsParams struct {
 
 // PackagesParams are query parameters for /v1/packages/{path}.
 type PackagesParams struct {
+	// module version (latest if empty)
 	Version string `form:"version"`
 	ListParams
 }
 
 // SearchParams are query parameters for /v1/search.
 type SearchParams struct {
-	Query  string `form:"q"`
+	// Find packages matching this query.
+	Query string `form:"q"`
+	// If non-empty, find symbols matching this string.
+	// The query further restricts the search to matching packages.
 	Symbol string `form:"symbol"`
 	ListParams
 }
 
 // VulnParams are query parameters for /v1/vulns/{module}.
 type VulnParams struct {
+	// module version (latest if empty)
 	Version string `form:"version"`
 	ListParams
 }

@@ -168,6 +168,8 @@ func ServeModule(w http.ResponseWriter, r *http.Request, ds internal.DataSource)
 // api:desc If there are tagged versions, they are returned.
 // api:desc Otherwise, the 10 most recent pseudo-versions are returned.
 // api:desc The versions are in descending order.
+// api:desc Only results whose version
+// api:desc contains the filter query parameter as a substring are returned.
 func ServeModuleVersions(w http.ResponseWriter, r *http.Request, ds internal.DataSource) (err error) {
 	defer derrors.Wrap(&err, "ServeModuleVersions")
 
@@ -226,6 +228,8 @@ func ServeModuleVersions(w http.ResponseWriter, r *http.Request, ds internal.Dat
 // ServeModulePackages handles requests for the v1 module packages endpoint.
 // api:route /v1/packages/{path}
 // api:desc Information about packages of the module at {path}.
+// api:desc Only results whose path or synopsis
+// api:desc contains the filter query parameter as a substring are returned.
 func ServeModulePackages(w http.ResponseWriter, r *http.Request, ds internal.DataSource) (err error) {
 	defer derrors.Wrap(&err, "ServeModulePackages")
 
@@ -277,7 +281,9 @@ func ServeModulePackages(w http.ResponseWriter, r *http.Request, ds internal.Dat
 
 // ServeSearch handles requests for the v1 search endpoint.
 // api:route /v1/search
-// api:desc Search results.
+// api:desc Search results. Only results whose package path
+// api:desc or synopsis contains the filter query parameter
+// api:desc as a substring are returned.
 func ServeSearch(w http.ResponseWriter, r *http.Request, ds internal.DataSource) (err error) {
 	defer derrors.Wrap(&err, "ServeSearch")
 
@@ -331,6 +337,8 @@ func ServeSearch(w http.ResponseWriter, r *http.Request, ds internal.DataSource)
 // ServePackageSymbols handles requests for the v1 package symbols endpoint.
 // api:route /v1/symbols/{path}
 // api:desc List of symbols for the package at {path}.
+// api:desc Only results whose name or synopsis
+// api:desc contains the filter query parameter as a substring are returned.
 func ServePackageSymbols(w http.ResponseWriter, r *http.Request, ds internal.DataSource) (err error) {
 	defer derrors.Wrap(&err, "ServePackageSymbols")
 
@@ -384,7 +392,10 @@ func ServePackageSymbols(w http.ResponseWriter, r *http.Request, ds internal.Dat
 
 // ServePackageImportedBy handles requests for the v1 package imported-by endpoint.
 // api:route /v1/imported-by/{path}
-// api:desc Paths of packages importing the package at {path}, not including packages in the same module.
+// api:desc Paths of packages importing the package at {path},
+// api:desc not including packages in the same module.
+// api:desc Only results whose path
+// api:desc contains the filter query parameter as a substring are returned.
 func ServePackageImportedBy(w http.ResponseWriter, r *http.Request, ds internal.DataSource) (err error) {
 	defer derrors.Wrap(&err, "ServePackageImportedBy")
 
@@ -450,6 +461,8 @@ func ServePackageImportedBy(w http.ResponseWriter, r *http.Request, ds internal.
 // api:route /v1/vulns/{path}
 // api:desc Vulnerabilities of the module at {path}, from
 // api:desc the Go vulnerability database (https://vuln.go.dev).
+// api:desc Only results whose ID or details
+// api:desc contains the filter query parameter as a substring are returned.
 func ServeVulnerabilities(vc *vuln.Client) func(w http.ResponseWriter, r *http.Request, _ internal.DataSource) error {
 	return func(w http.ResponseWriter, r *http.Request, ds internal.DataSource) (err error) {
 		defer derrors.Wrap(&err, "ServeVulnerabilities")
