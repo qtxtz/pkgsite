@@ -81,14 +81,19 @@ type Readme struct {
 	Contents string `json:"contents"`
 }
 
-// Symbol is a symbol in /v1/symbols/{packagePath}.
+// PackageSymbols is the response for /v1/symbols/{packagePath}.
+type PackageSymbols struct {
+	ModulePath string                    `json:"modulePath"`
+	Version    string                    `json:"version"`
+	Symbols    PaginatedResponse[Symbol] `json:"symbols"`
+}
+
+// Symbol is a symbol in a package.
 type Symbol struct {
-	ModulePath string `json:"modulePath"`
-	Version    string `json:"version"`
-	Name       string `json:"name"`
-	Kind       string `json:"kind"`
-	Synopsis   string `json:"synopsis"`
-	Parent     string `json:"parent,omitempty"`
+	Name     string `json:"name"`
+	Kind     string `json:"kind"`
+	Synopsis string `json:"synopsis"`
+	Parent   string `json:"parent,omitempty"`
 }
 
 // SearchResults is the response for /v1/search?q={query}.

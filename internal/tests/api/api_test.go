@@ -1161,12 +1161,12 @@ func testServePackageSymbols(t *testing.T, ds internal.TestingDataSource) {
 			}
 
 			if test.wantStatus == http.StatusOK {
-				var got api.PaginatedResponse[api.Symbol]
+				var got api.PackageSymbols
 				if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
 					t.Fatalf("json.Unmarshal: %v", err)
 				}
 				var gotNames []string
-				for _, it := range got.Items {
+				for _, it := range got.Symbols.Items {
 					gotNames = append(gotNames, it.Name)
 				}
 				slices.Sort(gotNames)

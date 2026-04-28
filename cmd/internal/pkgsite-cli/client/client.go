@@ -159,11 +159,11 @@ func (c *Client) GetSymbols(ctx context.Context, path, version string, opts Symb
 	}
 	u := c.server.JoinPath("v1", "symbols", path)
 	u.RawQuery = q.Encode()
-	var resp PaginatedResponse[Symbol]
+	var resp PackageSymbols
 	if err := c.get(ctx, u.String(), &resp); err != nil {
 		return nil, err
 	}
-	return &resp, nil
+	return &resp.Symbols, nil
 }
 
 // ImportedByOptions contains options for GetImportedBy.

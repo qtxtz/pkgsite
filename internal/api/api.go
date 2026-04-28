@@ -372,19 +372,22 @@ func ServePackageSymbols(w http.ResponseWriter, r *http.Request, ds internal.Dat
 	var items []Symbol
 	for _, s := range syms {
 		items = append(items, Symbol{
-			ModulePath: um.ModulePath,
-			Version:    um.Version,
-			Name:       s.Name,
-			Kind:       string(s.Kind),
-			Synopsis:   s.Synopsis,
-			Parent:     s.ParentName,
+			Name:     s.Name,
+			Kind:     string(s.Kind),
+			Synopsis: s.Synopsis,
+			Parent:   s.ParentName,
 		})
 	}
 
-	// api:response PaginatedResponse[Symbol]
-	resp, err := paginate(items, params.ListParams, defaultLimit)
+	paged, err := paginate(items, params.ListParams, defaultLimit)
 	if err != nil {
 		return err
+	}
+	// api:response PackageSymbols
+	resp := PackageSymbols{
+		ModulePath: um.ModulePath,
+		Version:    um.Version,
+		Symbols:    paged,
 	}
 
 	return serveJSON(w, http.StatusOK, resp, versionCacheDur(params.Version))

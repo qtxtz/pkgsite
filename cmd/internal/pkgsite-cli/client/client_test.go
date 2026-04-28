@@ -202,13 +202,17 @@ func TestSearch(t *testing.T) {
 
 func TestGetSymbols(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(PaginatedResponse[Symbol]{
-			Items: []Symbol{{
-				Name:     "Marshal",
-				Kind:     "func",
-				Synopsis: "func Marshal(v any) ([]byte, error)",
-			}},
-			Total: 1,
+		json.NewEncoder(w).Encode(PackageSymbols{
+			ModulePath: "std",
+			Version:    "go1.26.0",
+			Symbols: PaginatedResponse[Symbol]{
+				Items: []Symbol{{
+					Name:     "Marshal",
+					Kind:     "func",
+					Synopsis: "func Marshal(v any) ([]byte, error)",
+				}},
+				Total: 1,
+			},
 		})
 	}))
 	defer srv.Close()
