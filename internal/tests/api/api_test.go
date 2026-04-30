@@ -245,6 +245,15 @@ func testServePackage(t *testing.T, ds internal.TestingDataSource) {
 		overrideDS internal.DataSource
 	}{
 		{
+			name:       "missing package path",
+			url:        "/v1/package/",
+			wantStatus: http.StatusBadRequest,
+			want: &api.Error{
+				Code:    http.StatusBadRequest,
+				Message: "missing package path",
+			},
+		},
+		{
 			name:       "basic metadata",
 			url:        "/v1/package/example.com/pkg?version=v1.2.3",
 			wantStatus: http.StatusOK,
@@ -538,6 +547,15 @@ func testServeModule(t *testing.T, ds internal.TestingDataSource) {
 		wantStatus int
 		want       any
 	}{
+		{
+			name:       "invalid query parameter",
+			url:        "/v1/module/example.com?licenses=invalid",
+			wantStatus: http.StatusBadRequest,
+			want: &api.Error{
+				Code:    http.StatusBadRequest,
+				Message: `invalid boolean value "invalid" for licenses: strconv.ParseBool: parsing "invalid": invalid syntax`,
+			},
+		},
 		{
 			name:       "basic module metadata",
 			url:        "/v1/module/example.com?version=v1.2.3",
@@ -1233,6 +1251,15 @@ func testServePackageImportedBy(t *testing.T, ds internal.TestingDataSource) {
 		wantCount  int
 		want       any
 	}{
+		{
+			name:       "missing package path",
+			url:        "/v1/imported-by/",
+			wantStatus: http.StatusBadRequest,
+			want: &api.Error{
+				Code:    http.StatusBadRequest,
+				Message: "missing package path",
+			},
+		},
 		{
 			name:       "all imported by",
 			url:        "/v1/imported-by/example.com/pkg?version=v1.2.3",
