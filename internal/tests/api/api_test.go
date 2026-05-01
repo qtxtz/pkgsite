@@ -106,9 +106,7 @@ func testAPI(t *testing.T, newTestingDataSource func(t *testing.T) internal.Test
 	})
 }
 
-// TODO(jba): add to the set of modules until all tests pass.
-// Then call once at the top of TestAPI.
-func insertModules(t *testing.T, ds internal.TestingDataSource) {
+func testServePackage(t *testing.T, ds internal.TestingDataSource) {
 	const (
 		pkgPath        = "example.com/a/b"
 		modulePath1    = "example.com/a"
@@ -141,30 +139,21 @@ func insertModules(t *testing.T, ds internal.TestingDataSource) {
 		}},
 	})
 	for _, mp := range []string{modulePath1, modulePath2} {
-		u := &internal.Unit{
-			UnitMeta: internal.UnitMeta{
-				Path: pkgPath,
-				ModuleInfo: internal.ModuleInfo{
-					ModulePath:        mp,
-					Version:           earlierVersion,
-					LatestVersion:     earlierVersion,
-					IsRedistributable: true,
-				},
-				Name: "b",
-			},
-			Documentation:     []*internal.Documentation{sample.Documentation("linux", "amd64", sample.DocContents)},
-			IsRedistributable: true,
-		}
-		ds.MustInsertModule(t, &internal.Module{
+		u := &internal.Unit{UnitMeta: internal.UnitMeta{
+			Path: pkgPath,
 			ModuleInfo: internal.ModuleInfo{
-				ModulePath:    mp,
-				Version:       earlierVersion,
-				LatestVersion: earlierVersion,
+				ModulePath:        mp,
+				Version:           earlierVersion,
+				LatestVersion:     earlierVersion,
+				IsRedistributable: true,
 			},
-			Units: []*internal.Unit{u},
+			Name: "b",
+		}, Documentation: []*internal.Documentation{sample.Documentation("linux", "amd64", sample.DocContents)}, IsRedistributable: true}
+		ds.MustInsertModule(t, &internal.Module{
+			ModuleInfo: internal.ModuleInfo{ModulePath: mp, Version: earlierVersion, LatestVersion: earlierVersion},
+			Units:      []*internal.Unit{u},
 		})
 	}
-
 	ds.MustInsertModule(t, &internal.Module{
 		ModuleInfo: internal.ModuleInfo{
 			ModulePath:    "example.com",
@@ -218,6 +207,7 @@ func insertModules(t *testing.T, ds internal.TestingDataSource) {
 	// The DB needs the above go.mod contents to know that the module
 	// is deprecated. It doesn't look at ModuleInfo.Deprecated.
 	modInfo.ModulePath = "example.com/d"
+	modInfo.ModulePath = "example.com/d"
 	modInfo.Deprecated = false
 	ds.MustInsertModule(t, &internal.Module{
 		ModuleInfo: modInfo,
@@ -230,12 +220,6 @@ func insertModules(t *testing.T, ds internal.TestingDataSource) {
 			IsRedistributable: true,
 		}},
 	})
-
-}
-
-func testServePackage(t *testing.T, ds internal.TestingDataSource) {
-	insertModules(t, ds)
-	// TODO(jba): call insertModules in other tests.
 
 	for _, test := range []struct {
 		name       string
